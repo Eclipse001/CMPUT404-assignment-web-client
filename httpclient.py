@@ -56,11 +56,19 @@ class HTTPClient(object):
     def parse_url(self,url,component):
         o=urlparse.urlparse(url)
         if(component=="port"):
+            if o.port==None:
+                o.port=80
             return o.port
         if(component=="path"):
             return o.path
         if(component=="hostname"):
-            return o.hostname        
+            return o.hostname
+    
+    def construct_request(self,method,url,args):
+        if method=="GET":
+            return "GET "+self.parse_url("path")+" HTTP/1.1 \r\nHost: "+self.parse_url("hostname")+"\r\n\r\n"
+        elif method=="POST":
+            return "POST "+self.parse_url("path")+" HTTP/1.1 \r\nContent-Length: "+len(urllib.urlencode(args))+"\r\n"+urllib.urlencode(args)+"\r\n\r\n"
 
     # read everything from the socket
     def recvall(self, sock):
@@ -74,21 +82,43 @@ class HTTPClient(object):
                 done = not part
         return str(buffer)
 
-    def GET(self, url, args=None):
-        code = 500
-        body = ""
-        return HTTPResponse(code, body)
+    def GET(self,url,args=None):
+        request = self.construct_request("GET",url,args)
+        
+        socket=self.connect(self.parse_url("hostname"),self.parse_url("port"))
+        socket.sendall(request)
+        
+        response=self.recvall(socket)
+        
+        code=self.get_code(response)
+        try:
+            body=self.get_body(response)
+        except IndexError:
+            body=""
+        
+        return HTTPResponse(code,body)
 
-    def POST(self, url, args=None):
-        code = 500
-        body = ""
-        return HTTPResponse(code, body)
+    def POST(self,url,args=None):
+        request = self.construct_request("POST",url,args)
+        
+        socket=self.connect(self.parse_url("hostname"),self.parse_url("port"))
+        socket.sendall(request)
+                
+        response=self.recvall(socket)
+                
+        code=self.get_code(response)
+        try:
+            body=self.get_body(response)
+        except IndexError:
+            body=""        
+        
+        return HTTPResponse(code,body)
 
-    def command(self, url, command="GET", args=None):
+    def command(self, url,command="GET",args=None):
         if (command == "POST"):
-            return self.POST( url, args )
+            return self.POST(url,args)
         else:
-            return self.GET( url, args )
+            return self.GET(url,args)
     
 if __name__ == "__main__":
     client = HTTPClient()
