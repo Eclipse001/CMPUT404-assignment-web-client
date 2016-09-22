@@ -23,6 +23,7 @@ import socket
 import re
 # you may use urllib to encode data appropriately
 import urllib
+import urlparse
 
 def help():
     print "httpclient.py [GET/POST] [URL]\n"
@@ -33,20 +34,33 @@ class HTTPResponse(object):
         self.body = body
 
 class HTTPClient(object):
-    #def get_host_port(self,url):
+    
+    def get_host_port(self,url):
+        return [socket.gethostbyname(url.split("://")[-1].split("/")[0]),80]
 
     def connect(self, host, port):
         # use sockets!
-        return None
+        socket=socket.socket(socket.AF_INET,socket.SOCK_STREAM)
+        socket.connect(host,port)
+        return socket
 
     def get_code(self, data):
-        return None
+        return data.split(" ")[1]
 
-    def get_headers(self,data):
-        return None
+    def get_headers(self, data):
+        return data.split("\r\n\r\n",1)[0]
 
     def get_body(self, data):
-        return None
+        return data.split("\r\n\r\n",1)[1]
+    
+    def parse_url(self,url,component):
+        o=urlparse.urlparse(url)
+        if(component=="port"):
+            return o.port
+        if(component=="path"):
+            return o.path
+        if(component=="hostname"):
+            return o.hostname        
 
     # read everything from the socket
     def recvall(self, sock):
