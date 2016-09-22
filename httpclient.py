@@ -40,12 +40,14 @@ class HTTPClient(object):
 
     def connect(self, host, port):
         # use sockets!
-        socket=socket.socket(socket.AF_INET,socket.SOCK_STREAM)
-        socket.connect(host,port)
-        return socket
+        if port==None:
+            port=80
+        sock=socket.socket(socket.AF_INET,socket.SOCK_STREAM)
+        sock.connect((host,port))
+        return sock
 
     def get_code(self, data):
-        return data.split(" ")[1]
+        return int(data.split(" ")[1])
 
     def get_headers(self, data):
         return data.split("\r\n\r\n",1)[0]
@@ -56,8 +58,6 @@ class HTTPClient(object):
     def parse_url(self,url,component):
         o=urlparse.urlparse(url)
         if(component=="port"):
-            if o.port==None:
-                o.port=80
             return o.port
         if(component=="path"):
             return o.path
@@ -65,13 +65,18 @@ class HTTPClient(object):
             return o.hostname
     
     def construct_request(self,method,url,args):
+        if args==None:
+            encode_args=""
+        else:
+            encode_args=urllib.urlencode(args)        
+        
         if method=="GET":
-            return "GET "+self.parse_url("path")+" HTTP/1.1 \r\nHost: "+self.parse_url("hostname")+"\r\n\r\n"
+            return "GET "+self.parse_url(url,"path")+" HTTP/1.1\r\nHost: "+self.parse_url(url,"hostname")+"\r\n\r\n"
         elif method=="POST":
-            return "POST "+self.parse_url("path")+" HTTP/1.1 \r\nContent-Length: "+len(urllib.urlencode(args))+"\r\n"+urllib.urlencode(args)+"\r\n\r\n"
+            return "POST "+self.parse_url(url,"path")+" HTTP/1.1\r\nHost: "+self.parse_url(url,"hostname")+"\r\nContent-Type: application/x-www-form-urlencoded\r\nContent-Length: "+str(len(encode_args))+"\r\n\r\n"+encode_args+"\r\n"
 
     # read everything from the socket
-    def recvall(self, sock):
+    def recvall(self,sock):
         buffer = bytearray()
         done = False
         while not done:
@@ -81,40 +86,30 @@ class HTTPClient(object):
             else:
                 done = not part
         return str(buffer)
-
-    def GET(self,url,args=None):
-        request = self.construct_request("GET",url,args)
+    
+    def HTTP_method(self,method,url,args=None):
+        request = self.construct_request(method,url,args)
         
-        socket=self.connect(self.parse_url("hostname"),self.parse_url("port"))
-        socket.sendall(request)
+        sock=self.connect(self.parse_url(url,"hostname"),self.parse_url(url,"port"))
+        sock.sendall(request)      
+        response=self.recvall(sock)
         
-        response=self.recvall(socket)
-        
+        sock.close()      
         code=self.get_code(response)
         try:
             body=self.get_body(response)
         except IndexError:
             body=""
-        
-        return HTTPResponse(code,body)
+                
+        return HTTPResponse(code,body)        
+
+    def GET(self,url,args=None):
+        return self.HTTP_method("GET",url,args)
 
     def POST(self,url,args=None):
-        request = self.construct_request("POST",url,args)
-        
-        socket=self.connect(self.parse_url("hostname"),self.parse_url("port"))
-        socket.sendall(request)
-                
-        response=self.recvall(socket)
-                
-        code=self.get_code(response)
-        try:
-            body=self.get_body(response)
-        except IndexError:
-            body=""        
-        
-        return HTTPResponse(code,body)
+        return self.HTTP_method("POST",url,args)
 
-    def command(self, url,command="GET",args=None):
+    def command(self,url,command="GET",args=None):
         if (command == "POST"):
             return self.POST(url,args)
         else:
@@ -127,6 +122,6 @@ if __name__ == "__main__":
         help()
         sys.exit(1)
     elif (len(sys.argv) == 3):
-        print client.command( sys.argv[2], sys.argv[1] )
+        print client.command(sys.argv[2],sys.argv[1] )
     else:
-        print client.command( sys.argv[1] )   
+        print client.command(sys.argv[1])   
