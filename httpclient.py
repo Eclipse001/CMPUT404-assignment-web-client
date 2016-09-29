@@ -94,6 +94,8 @@ class HTTPClient(object):
         sock.sendall(request)      
         response=self.recvall(sock)
         
+        print response
+        
         sock.close()      
         code=self.get_code(response)
         try:
